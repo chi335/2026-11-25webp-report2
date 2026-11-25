@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>초간단 계약서 · 견적서 · 청구서 생성기</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 왼쪽: 입력 폼 (인쇄 시 숨겨짐) -->
+    <aside class="editor-panel no-print">
+      <!-- 🎓 대학교 학업 목적 안내 뱃지 -->
+      <div class="academic-badge">
+        🎓 본 웹사이트는 대학교 학업목적을 위해서 제작된 프로젝트입니다.
+      </div>
+
+      <h2>📝 서식 및 정보 입력</h2>
+      <p class="desc">원하는 서식을 선택하고 내용을 입력하세요. (서버 저장 없음)</p>
+
+      <!-- 📂 서식 전환 탭 -->
+      <div class="tab-group">
+        <button type="button" class="tab-btn active" data-type="contract">📄 간이 계약서</button>
+        <button type="button" class="tab-btn" data-type="estimate">📋 견적서</button>
+        <button type="button" class="tab-btn" data-type="invoice">💳 대금 청구서</button>
+      </div>
+      
+      <form id="contract-form">
+        <label>프로젝트/작업명
+          <input type="text" id="title" placeholder="예: 웹사이트 메인 페이지 디자인" required>
+        </label>
+        
+        <div class="row">
+          <label>발주자 (갑 / 청구처)
+            <input type="text" id="client" placeholder="홍길동 (또는 회사명)">
+          </label>
+          <label>수주자 (을 / 공급자)
+            <input type="text" id="freelancer" placeholder="김개발">
+          </label>
+        </div>
+
+        <div class="row">
+          <label>금액 (원)
+            <input type="number" id="amount" placeholder="1000000">
+          </label>
+          <label>세금 / 부가가치세 설정
+            <select id="taxType">
+              <option value="vat_exclude">VAT 10% 별도 (+10%)</option>
+              <option value="vat_include">VAT 10% 포함</option>
+              <option value="freelancer_33">프리랜서 3.3% 원천징수 (-3.3%)</option>
+              <option value="none">세금 계산 없음</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- 📅 작성일자 & 마감일 입력란 -->
+        <div class="row">
+          <label>문서 작성일자
+            <input type="date" id="contractDate">
+          </label>
+          <label id="lbl-dueDate">작업 마감일 / 납기일
+            <input type="date" id="dueDate">
+          </label>
+        </div>
+
+        <label>특약 및 안내 사항 (입금 계좌 등)
+          <textarea id="terms" rows="3" placeholder="예: 국민은행 123-456-7890 (예금주: 김개발) / 수정은 총 2회 무료"></textarea>
+        </label>
+
+        <!-- ✍️ 양측 전자서명 입력란 -->
+        <div class="row">
+          <div class="form-group">
+            <label>발주자 (갑) 서명/도장</label>
+            <div class="canvas-container">
+              <canvas id="sig-canvas-client"></canvas>
+              <button type="button" id="clear-sig-client" class="btn-clear">지우기</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>수주자 (을) 서명/도장</label>
+            <div class="canvas-container">
+              <canvas id="sig-canvas-freelancer"></canvas>
+              <button type="button" id="clear-sig-freelancer" class="btn-clear">지우기</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 💡 기능 버튼 그룹 -->
+        <div class="btn-group">
+          <button type="button" id="save-btn" class="btn-save">💾 임시 저장</button>
+          <button type="button" id="load-btn" class="btn-load">📂 불러오기</button>
+          <button type="button" id="reset-btn" class="btn-reset">🗑️ 삭제 (초기화)</button>
+          <button type="button" id="print-btn" class="btn-primary">🖨️ PDF 다운로드 / 인쇄</button>
+        </div>
+      </form>
+    </aside>
+
+    <!-- 오른쪽: 실시간 인쇄용 미리보기 -->
+    <main class="preview-panel">
+      <div id="paper" class="paper">
+        <h1 id="doc-main-title" class="doc-title">간 이 용 역 계 약 서</h1>
+        
+        <p id="pv-intro" class="intro">
+          발주자 <strong id="pv-client">___</strong>(이하 "갑")과 수주자 <strong id="pv-freelancer">___</strong>(이하 "을")은 
+          상호 신의성실의 원칙에 따라 아래와 같이 용역 계약을 체결한다.
+        </p>
+
+        <table class="contract-table">
+          <tr>
+            <th>프로젝트명</th>
+            <td id="pv-title">-</td>
+          </tr>
+          <tr>
+            <th id="pv-th-amount">계약 금액</th>
+            <td id="pv-amount-box">
+              <strong id="pv-amount">0</strong> 원
+            </td>
+          </tr>
+          <tr>
+            <th id="pv-th-dueDate">완수 기한</th>
+            <td id="pv-dueDate">-</td>
+          </tr>
+        </table>
+
+        <!-- 계약서 전용 조항 영역 -->
+        <div id="contract-clauses">
+          <h3>제 1 조 (목적 및 내용)</h3>
+          <p>"을"은 "갑"이 요청한 위 프로젝트를 성실히 수행하여 기한 내에 납품한다.</p>
+
+          <h3>제 2 조 (대금 지급)</h3>
+          <p id="pv-payment-clause">"갑"은 "을"이 작업을 완료하고 검수를 마친 후 7일 이내에 계약 금액을 전액 지급한다.</p>
+        </div>
+
+        <h3 id="pv-h3-terms">제 3 조 (특약 사항)</h3>
+        <p id="pv-terms" class="terms-box">등록된 내용이 없습니다.</p>
+
+        <div class="signatures">
+          <!-- 📅 작성일자 표기 영역 -->
+          <p class="date">작성일자: <span id="pv-contractDate">2026년 11월 25일</span></p>
+          
+          <!-- 계약서용 양측 서명란 -->
+          <div id="sig-row-contract" class="sig-row">
+            <div class="sig-box">
+              "갑" (발주자): <span id="pv-client-name">___</span>
+              <img id="pv-sig-img-client" src="" alt="갑 서명" class="sig-img hidden">
+              <span id="pv-sig-text-client">(인)</span>
+            </div>
+            <div class="sig-box">
+              "을" (수주자): <span id="pv-freelancer-name">___</span>
+              <img id="pv-sig-img-freelancer" src="" alt="을 서명" class="sig-img hidden">
+              <span id="pv-sig-text-freelancer">(인)</span>
+            </div>
+          </div>
+
+          <!-- 견적서/청구서 전용 단독 서명란 -->
+          <div id="sig-row-single" class="sig-row single hidden">
+            <div></div>
+            <div class="sig-box">
+              공급자/청구인: <span id="pv-single-name">___</span>
+              <img id="pv-sig-img-single" src="" alt="서명" class="sig-img hidden">
+              <span id="pv-sig-text-single">(인)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
